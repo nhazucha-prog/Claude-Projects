@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TaskFlow</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>TaskFlow</h1>
+      <p class="subtitle">A simple way to track what matters</p>
+    </header>
+
+    <div class="input-bar">
+      <input type="text" id="taskInput" placeholder="What needs to be done?" autofocus>
+      <input type="date" id="dateInput" title="Due date (optional)">
+      <button id="addBtn" aria-label="Add task">+</button>
+    </div>
+
+    <div class="filters">
+      <button class="filter active" data-filter="all">All</button>
+      <button class="filter" data-filter="active">Active</button>
+      <button class="filter" data-filter="completed">Completed</button>
+    </div>
+
+    <ul id="taskList" class="task-list"></ul>
+
+    <footer id="stats" class="stats" hidden>
+      <span id="taskCount"></span>
+      <button id="clearCompleted" class="clear-btn">Clear completed</button>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
