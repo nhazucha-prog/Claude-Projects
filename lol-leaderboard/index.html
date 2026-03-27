@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rift Roster - LoL Friend Leaderboard</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#x1F3C6;</text></svg>">
+</head>
+<body>
+
+  <div class="app">
+
+    <!-- Error Banner -->
+    <div id="error-banner" class="error-banner" hidden>
+      <span id="error-message">Could not reach the server.</span>
+      <button class="error-close" onclick="document.getElementById('error-banner').hidden=true">&times;</button>
+    </div>
+
+    <!-- ======================== LEADERBOARD VIEW ======================== -->
+    <div id="leaderboard-view">
+      <header>
+        <h1>Rift Roster</h1>
+        <p class="subtitle">Friend group ranked leaderboard</p>
+      </header>
+
+      <div class="toolbar">
+        <button class="btn btn-accent" id="refresh-btn">
+          <span class="btn-icon">&#x21bb;</span> Refresh
+        </button>
+        <button class="btn btn-outline" id="add-player-btn">
+          <span class="btn-icon">+</span> Add Player
+        </button>
+      </div>
+
+      <div class="queue-filters">
+        <button class="queue-filter active" data-queue="">All Queues</button>
+        <button class="queue-filter" data-queue="420">Ranked Solo</button>
+        <button class="queue-filter" data-queue="440">Ranked Flex</button>
+        <button class="queue-filter" data-queue="400">Draft Pick</button>
+        <button class="queue-filter" data-queue="1700">Arena</button>
+      </div>
+
+      <div id="leaderboard-list" class="player-list">
+        <!-- Populated by JS -->
+      </div>
+
+      <footer class="last-updated">
+        <span id="last-updated-text">Last updated: never</span>
+      </footer>
+    </div>
+
+    <!-- ======================== PLAYER DETAIL VIEW ======================== -->
+    <div id="player-view" hidden>
+      <button class="btn btn-ghost back-btn" id="back-btn">
+        &#x2190; Back to Leaderboard
+      </button>
+
+      <div id="player-header" class="player-header">
+        <!-- Player name, rank, LP -->
+      </div>
+
+      <div id="stat-cards" class="stat-cards">
+        <!-- 3 stat cards -->
+      </div>
+
+      <section class="detail-section">
+        <h3>Top Champions</h3>
+        <div id="top-champions" class="top-champions">
+          <!-- Champion rows -->
+        </div>
+      </section>
+
+      <section class="detail-section">
+        <h3>Recent Matches</h3>
+        <div id="recent-matches" class="recent-matches">
+          <!-- Match rows -->
+        </div>
+      </section>
+    </div>
+
+    <!-- ======================== ADD PLAYER MODAL ======================== -->
+    <div id="add-modal" class="modal-overlay" hidden>
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2>Manage Roster</h2>
+          <button class="modal-close" id="modal-close-btn">&times;</button>
+        </div>
+
+        <div class="modal-form">
+          <input type="text" id="input-game-name" placeholder="Game Name" autocomplete="off">
+          <input type="text" id="input-tag-line" placeholder="Tag Line (e.g. NA1)" autocomplete="off">
+          <button class="btn btn-accent" id="modal-add-btn">Add</button>
+        </div>
+
+        <div class="roster-section">
+          <h4>Current Roster</h4>
+          <ul id="roster-list" class="roster-list">
+            <!-- Roster items -->
+          </ul>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

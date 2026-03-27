@@ -1,4 +1,14 @@
-# Project Guidelines
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Architecture
+
+This is a monorepo of standalone web projects, each in its own subdirectory (e.g., `task-app/`). Projects use vanilla HTML, CSS, and JavaScript with no build tools, bundlers, or frameworks.
+
+## Running Projects
+
+Open any project's `index.html` directly in a browser — no dev server required.
 
 ## Design
 
