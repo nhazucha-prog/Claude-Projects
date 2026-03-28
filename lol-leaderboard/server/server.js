@@ -15,7 +15,7 @@ app.use(cors({
   origin: function (origin, callback) {
     const allowed = [
       'https://nhazucha-prog.github.io',
-      'https://RENDER_SERVICE_NAME.onrender.com', // TODO: replace RENDER_SERVICE_NAME after Render setup
+      'https://claude-projects-fy5u.onrender.com',
       'http://localhost:3000',
       'http://localhost:5500',
       'http://127.0.0.1:5500',

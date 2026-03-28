@@ -2,7 +2,7 @@
   // ======================== CONFIG ========================
   const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:3001'
-    : 'https://RENDER_SERVICE_NAME.onrender.com'; // TODO: replace RENDER_SERVICE_NAME after Render setup
+    : 'https://claude-projects-fy5u.onrender.com';
   let DDRAGON_VERSION = '14.10.1'; // fallback; auto-updated on init
   let DDRAGON_BASE = `https://ddragon.leagueoflegends.com/cdn/${DDRAGON_VERSION}/img`;
 
