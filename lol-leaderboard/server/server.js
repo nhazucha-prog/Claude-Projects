@@ -516,15 +516,50 @@ const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
 let knownRoster = []; // players to pre-cache (loaded from players.json + synced from frontend)
 let lastBackgroundRefresh = null;
 
+// Shared roster — persisted to disk so additions survive across users/sessions.
+// Survives restarts but NOT redeploys (Render's filesystem is ephemeral on deploy).
+const SHARED_ROSTER_FILE = path.join(__dirname, 'shared-roster.json');
+
+function saveSharedRoster() {
+  try {
+    fs.writeFileSync(SHARED_ROSTER_FILE, JSON.stringify(knownRoster, null, 2));
+  } catch (err) {
+    console.warn('Could not save shared roster:', err.message);
+  }
+}
+
 function loadDefaultRoster() {
+  // Always start by seeding from players.json so the baseline survives redeploys
   try {
     const playersFile = path.join(__dirname, '..', 'players.json');
     if (fs.existsSync(playersFile)) {
       knownRoster = JSON.parse(fs.readFileSync(playersFile, 'utf8'));
-      console.log(`Loaded ${knownRoster.length} players from players.json`);
+      console.log(`Seeded ${knownRoster.length} players from players.json`);
     }
   } catch (err) {
     console.warn('Could not load players.json:', err.message);
+  }
+
+  // Then merge in any disk-persisted shared additions
+  try {
+    if (fs.existsSync(SHARED_ROSTER_FILE)) {
+      const stored = JSON.parse(fs.readFileSync(SHARED_ROSTER_FILE, 'utf8'));
+      if (Array.isArray(stored)) {
+        const seen = new Set(knownRoster.map(p => `${p.gameName.toLowerCase()}#${p.tagLine.toLowerCase()}`));
+        let added = 0;
+        for (const p of stored) {
+          const key = `${p.gameName.toLowerCase()}#${p.tagLine.toLowerCase()}`;
+          if (!seen.has(key)) {
+            knownRoster.push({ gameName: p.gameName, tagLine: p.tagLine });
+            seen.add(key);
+            added++;
+          }
+        }
+        console.log(`Merged ${added} additional players from shared-roster.json (total: ${knownRoster.length})`);
+      }
+    }
+  } catch (err) {
+    console.warn('Could not load shared-roster.json:', err.message);
   }
 }
 
@@ -550,19 +585,59 @@ async function backgroundRefresh() {
   console.log(`Background refresh done in ${((Date.now() - start) / 1000).toFixed(1)}s`);
 }
 
-// Endpoint for frontend to sync its roster so background refresh covers all players
+// Get the current shared roster (used by all clients as the source of truth)
+app.get('/api/roster', (req, res) => {
+  res.json({ players: knownRoster });
+});
+
+// Add a player to the shared roster
+app.post('/api/roster', (req, res) => {
+  const { gameName, tagLine } = req.body || {};
+  if (!gameName || !tagLine || typeof gameName !== 'string' || typeof tagLine !== 'string') {
+    return res.status(400).json({ error: 'gameName and tagLine are required strings' });
+  }
+  const key = `${gameName.toLowerCase()}#${tagLine.toLowerCase()}`;
+  const exists = knownRoster.some(
+    p => `${p.gameName.toLowerCase()}#${p.tagLine.toLowerCase()}` === key
+  );
+  if (!exists) {
+    knownRoster.push({ gameName: gameName.trim(), tagLine: tagLine.trim() });
+    saveSharedRoster();
+  }
+  res.json({ status: 'ok', players: knownRoster, added: !exists });
+});
+
+// Remove a player from the shared roster
+app.delete('/api/roster', (req, res) => {
+  const { gameName, tagLine } = req.body || {};
+  if (!gameName || !tagLine) {
+    return res.status(400).json({ error: 'gameName and tagLine are required' });
+  }
+  const before = knownRoster.length;
+  knownRoster = knownRoster.filter(
+    p => !(p.gameName.toLowerCase() === gameName.toLowerCase() && p.tagLine.toLowerCase() === tagLine.toLowerCase())
+  );
+  const removed = before !== knownRoster.length;
+  if (removed) saveSharedRoster();
+  res.json({ status: 'ok', players: knownRoster, removed });
+});
+
+// Backwards-compat: bulk roster sync from older clients — merges into shared roster
 app.post('/api/roster-sync', (req, res) => {
   const { players } = req.body;
+  let added = 0;
   if (Array.isArray(players)) {
-    // Merge with existing roster (dedupe by gameName+tagLine)
     const seen = new Set(knownRoster.map(p => `${p.gameName.toLowerCase()}#${p.tagLine.toLowerCase()}`));
     for (const p of players) {
+      if (!p || !p.gameName || !p.tagLine) continue;
       const key = `${p.gameName.toLowerCase()}#${p.tagLine.toLowerCase()}`;
       if (!seen.has(key)) {
         knownRoster.push({ gameName: p.gameName, tagLine: p.tagLine });
         seen.add(key);
+        added++;
       }
     }
+    if (added > 0) saveSharedRoster();
   }
   res.json({ status: 'ok', rosterSize: knownRoster.length, lastRefresh: lastBackgroundRefresh });
 });

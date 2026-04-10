@@ -91,36 +91,53 @@
     errorBanner.hidden = true;
   }
 
-  // ======================== ROSTER (localStorage) ========================
+  // ======================== ROSTER (server-shared, localStorage fallback) ========================
+  // Source of truth is the server's /api/roster. localStorage is only a cold-start fallback
+  // so the page can render something while Render is waking up.
   async function loadRoster() {
+    // Try the server first — this is the shared roster everyone sees
+    try {
+      const res = await fetch(`${API_BASE}/api/roster`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.players) && data.players.length > 0) {
+          players = data.players;
+          saveRosterCache();
+          return;
+        }
+      }
+    } catch (_) { /* server cold/offline — fall through to local cache */ }
+
+    // Fallback: localStorage cache from a previous visit
     const stored = localStorage.getItem('lol-roster');
     if (stored) {
       try {
-        players = JSON.parse(stored);
-        // Clear stale placeholder names
-        const hasPlaceholder = players.some(p => p.gameName === 'SummonerOne' || p.gameName === 'SummonerTwo');
-        if (Array.isArray(players) && players.length > 0 && !hasPlaceholder) return;
+        const parsed = JSON.parse(stored);
+        const hasPlaceholder = parsed.some(p => p.gameName === 'SummonerOne' || p.gameName === 'SummonerTwo');
+        if (Array.isArray(parsed) && parsed.length > 0 && !hasPlaceholder) {
+          players = parsed;
+          return;
+        }
       } catch (_) { /* fall through */ }
     }
-    // Seed from players.json
+
+    // Last resort: bundled players.json
     localStorage.removeItem('lol-roster');
     try {
       const res = await fetch('players.json');
       players = await res.json();
-      saveRoster();
+      saveRosterCache();
     } catch (_) {
-      players = [
-        { gameName: 'Artu', tagLine: '9815' },
-      ];
-      saveRoster();
+      players = [{ gameName: 'Artu', tagLine: '9815' }];
+      saveRosterCache();
     }
   }
 
-  function saveRoster() {
+  function saveRosterCache() {
     localStorage.setItem('lol-roster', JSON.stringify(players));
   }
 
-  function addPlayer(gameName, tagLine) {
+  async function addPlayer(gameName, tagLine) {
     gameName = gameName.trim();
     tagLine = tagLine.trim();
     if (!gameName || !tagLine) return;
@@ -128,20 +145,56 @@
       (p) => p.gameName.toLowerCase() === gameName.toLowerCase() && p.tagLine.toLowerCase() === tagLine.toLowerCase()
     );
     if (exists) return;
+
+    // Optimistic local update
     players.push({ gameName, tagLine });
-    saveRoster();
-    syncRosterToServer();
+    saveRosterCache();
     renderRosterList();
     fetchLeaderboard();
+
+    // Persist to shared server roster
+    try {
+      const res = await fetch(`${API_BASE}/api/roster`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameName, tagLine })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.players)) {
+          players = data.players;
+          saveRosterCache();
+          renderRosterList();
+        }
+      }
+    } catch (_) { /* server unreachable — local add still applies */ }
   }
 
-  function removePlayer(gameName, tagLine) {
+  async function removePlayer(gameName, tagLine) {
+    // Optimistic local update
     players = players.filter(
       (p) => !(p.gameName.toLowerCase() === gameName.toLowerCase() && p.tagLine.toLowerCase() === tagLine.toLowerCase())
     );
-    saveRoster();
+    saveRosterCache();
     renderRosterList();
     fetchLeaderboard();
+
+    // Persist to shared server roster
+    try {
+      const res = await fetch(`${API_BASE}/api/roster`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameName, tagLine })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.players)) {
+          players = data.players;
+          saveRosterCache();
+          renderRosterList();
+        }
+      }
+    } catch (_) { /* server unreachable — local removal still applies */ }
   }
 
   // ======================== API CALLS ========================
