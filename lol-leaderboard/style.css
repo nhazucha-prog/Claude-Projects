@@ -694,12 +694,14 @@ h1 {
 
 .modal-form {
   display: flex;
+  align-items: stretch;
   gap: 8px;
   margin-bottom: 24px;
 }
 
 .modal-form input {
   flex: 1;
+  min-width: 0;
   padding: 12px 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -715,7 +717,8 @@ h1 {
 }
 
 .modal-form .btn {
-  padding: 12px 20px;
+  padding: 0 20px;
+  flex-shrink: 0;
 }
 
 .roster-section h4 {
@@ -816,6 +819,10 @@ h1 {
 
   .modal-form {
     flex-direction: column;
+  }
+
+  .modal-form .btn {
+    width: 100%;
   }
 
   .champion-row .champ-stats {
