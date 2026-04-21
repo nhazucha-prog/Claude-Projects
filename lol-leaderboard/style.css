@@ -622,6 +622,97 @@ h1 {
   flex-shrink: 0;
 }
 
+/* ======================== MATCH EXPAND PANEL ======================== */
+
+.match-row[data-match-id]:hover {
+  background: var(--surface-hover);
+}
+
+.match-expand-hint {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  margin-left: auto;
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+
+.match-row.expanded .match-expand-hint {
+  transform: rotate(180deg);
+}
+
+.match-row.expanded {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  margin-bottom: 0;
+}
+
+.match-expand-panel {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+  padding: 12px 14px;
+  margin-bottom: 6px;
+  animation: fadeIn 0.2s ease;
+}
+
+.match-expand-panel.loading {
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+}
+
+.opponents-header {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.opponent-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  font-size: 0.82rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.opponent-row:last-child {
+  border-bottom: none;
+}
+
+.opponent-name {
+  flex: 1;
+  color: var(--text);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.opponent-kda {
+  color: var(--text-muted);
+  font-weight: 600;
+  min-width: 60px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.opponent-row .rank-badge {
+  font-size: 0.65rem;
+  padding: 2px 8px;
+  flex-shrink: 0;
+}
+
+.opponent-row .match-champ-icon {
+  width: 24px;
+  height: 24px;
+}
+
 /* ======================== MODAL ======================== */
 
 .modal-overlay {

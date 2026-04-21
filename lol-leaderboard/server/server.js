@@ -289,11 +289,12 @@ async function buildPlayerData(gameName, tagLine, detailed, queue = null) {
 
   // Step 3: Fetch all match details concurrently (rate limiter handles pacing)
   const matchResults = await Promise.all(matchIds.map(id => getMatchDetail(id)));
-  const matches = matchResults.filter(Boolean);
 
   // Step 5: Extract player data from matches
   const playerMatches = [];
-  for (const match of matches) {
+  for (let i = 0; i < matchIds.length; i++) {
+    const match = matchResults[i];
+    if (!match) continue;
     const participant = match.info.participants.find(p => p.puuid === puuid);
     if (!participant) continue;
 
@@ -309,6 +310,7 @@ async function buildPlayerData(gameName, tagLine, detailed, queue = null) {
     }
 
     playerMatches.push({
+      matchId: matchIds[i],
       champion: participant.championName,
       win,
       kills: participant.kills,
@@ -402,6 +404,7 @@ async function buildPlayerData(gameName, tagLine, detailed, queue = null) {
   const result = {
     gameName,
     tagLine,
+    puuid,
     tier,
     rank,
     lp,
@@ -421,6 +424,7 @@ async function buildPlayerData(gameName, tagLine, detailed, queue = null) {
   if (detailed) {
     result.recentMatches = playerMatches.map(m => {
       const matchData = {
+        matchId: m.matchId,
         champion: m.champion,
         win: m.win,
         kills: m.kills,
@@ -505,6 +509,56 @@ app.get('/api/player/:gameName/:tagLine', async (req, res) => {
     res.json(data);
   } catch (err) {
     console.error(`Error in /api/player/${req.params.gameName}/${req.params.tagLine}:`, err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/match/:matchId/opponents', async (req, res) => {
+  try {
+    const { matchId } = req.params;
+    const puuid = req.query.puuid;
+    if (!puuid) return res.status(400).json({ error: 'puuid query param required' });
+
+    const match = await getMatchDetail(matchId);
+    if (!match) return res.status(404).json({ error: 'Match not found' });
+
+    // Arena has no traditional enemy team
+    if (match.info.gameMode === 'CHERRY') {
+      return res.json({ opponents: [] });
+    }
+
+    const currentPlayer = match.info.participants.find(p => p.puuid === puuid);
+    if (!currentPlayer) return res.status(404).json({ error: 'Player not found in match' });
+
+    const enemies = match.info.participants.filter(p => p.teamId !== currentPlayer.teamId);
+
+    const opponents = await Promise.all(enemies.map(async (e) => {
+      let tier = 'UNRANKED', rank = '', lp = 0;
+      try {
+        const ranked = await getRankedData(e.puuid);
+        const soloQ = (ranked || []).find(r => r.queueType === 'RANKED_SOLO_5x5')
+          || (ranked || []).find(r => r.queueType === 'RANKED_FLEX_SR')
+          || {};
+        tier = soloQ.tier || 'UNRANKED';
+        rank = soloQ.rank || '';
+        lp = soloQ.leaguePoints || 0;
+      } catch (_) { /* default to UNRANKED */ }
+
+      return {
+        riotId: `${e.riotIdGameName || 'Unknown'}#${e.riotIdTagline || '???'}`,
+        champion: e.championName,
+        kills: e.kills,
+        deaths: e.deaths,
+        assists: e.assists,
+        tier,
+        rank,
+        lp
+      };
+    }));
+
+    res.json({ opponents });
+  } catch (err) {
+    console.error(`Error in /api/match/${req.params.matchId}/opponents:`, err.message);
     res.status(500).json({ error: err.message });
   }
 });

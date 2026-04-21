@@ -539,17 +539,81 @@
             ? `#${m.placement}`
             : (m.win ? 'W' : 'L');
           const csText = isArena ? '' : `<span class="match-cs">${m.cs} CS</span>`;
+          const expandAttrs = !isArena && m.matchId
+            ? `data-match-id="${escapeAttr(m.matchId)}" data-puuid="${escapeAttr(data.puuid || '')}" style="animation-delay: ${i * 0.04}s; cursor: pointer;"`
+            : `style="animation-delay: ${i * 0.04}s"`;
           return `
-            <div class="match-row ${m.win ? 'win' : ''}" style="animation-delay: ${i * 0.04}s">
+            <div class="match-row ${m.win ? 'win' : ''}" ${expandAttrs}>
               <img class="match-champ-icon" src="${championImgUrl(m.champion)}" alt="${m.champion}" loading="lazy" onerror="this.style.display='none'">
               <span class="match-result ${resultClass}">${resultText}</span>
               <span class="match-kda">${m.kills}/${m.deaths}/${m.assists}</span>
               ${csText}
               <span class="match-duration">${m.duration}</span>
               <span class="match-meta">${escapeHtml(m.timeAgo)}</span>
+              ${!isArena && m.matchId ? '<span class="match-expand-hint">&#x25BC;</span>' : ''}
             </div>`;
         })
         .join('');
+
+      // Click-to-expand: show enemy team with ranked data
+      recentMatches.addEventListener('click', async (e) => {
+        const row = e.target.closest('.match-row[data-match-id]');
+        if (!row) return;
+
+        const matchId = row.dataset.matchId;
+        const puuid = row.dataset.puuid;
+
+        // Toggle: if already expanded, collapse
+        const existing = row.nextElementSibling;
+        if (existing && existing.classList.contains('match-expand-panel')) {
+          existing.remove();
+          row.classList.remove('expanded');
+          return;
+        }
+
+        // Close any other open panels
+        recentMatches.querySelectorAll('.match-expand-panel').forEach(p => p.remove());
+        recentMatches.querySelectorAll('.match-row.expanded').forEach(r => r.classList.remove('expanded'));
+
+        // Show loading panel
+        row.classList.add('expanded');
+        const panel = document.createElement('div');
+        panel.className = 'match-expand-panel loading';
+        panel.innerHTML = '<div class="spinner"></div>';
+        row.after(panel);
+
+        try {
+          const res = await fetch(`${API_BASE}/api/match/${encodeURIComponent(matchId)}/opponents?puuid=${encodeURIComponent(puuid)}`);
+          if (!res.ok) throw new Error(`${res.status}`);
+          const { opponents } = await res.json();
+
+          panel.classList.remove('loading');
+          if (!opponents || opponents.length === 0) {
+            panel.innerHTML = '<div class="empty-state">No opponent data available.</div>';
+            return;
+          }
+
+          panel.innerHTML = `
+            <div class="opponents-header">Enemy Team</div>
+            ${opponents.map(op => {
+              const tierLower = (op.tier || 'unranked').toLowerCase();
+              const rankText = op.tier === 'UNRANKED'
+                ? 'Unranked'
+                : `${op.tier} ${op.rank} ${op.lp} LP`;
+              return `
+                <div class="opponent-row">
+                  <img class="match-champ-icon" src="${championImgUrl(op.champion)}" alt="${op.champion}" loading="lazy" onerror="this.style.display='none'">
+                  <span class="opponent-name">${escapeHtml(op.riotId)}</span>
+                  <span class="opponent-kda">${op.kills}/${op.deaths}/${op.assists}</span>
+                  <span class="rank-badge ${tierLower}">${rankText}</span>
+                </div>`;
+            }).join('')}
+          `;
+        } catch (err) {
+          panel.classList.remove('loading');
+          panel.innerHTML = '<div class="empty-state">Failed to load opponent data.</div>';
+        }
+      });
     } else {
       recentMatches.innerHTML = '<div class="empty-state">No recent matches found.</div>';
     }
