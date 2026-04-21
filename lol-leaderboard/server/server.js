@@ -165,6 +165,7 @@ const TTL_PUUID = 24 * 60 * 60 * 1000;   // 24 hours
 const TTL_RANKED = 5 * 60 * 1000;          // 5 minutes
 const TTL_MATCH_IDS = 3 * 60 * 1000;       // 3 minutes
 const TTL_MATCH_DETAIL = 0;                 // indefinite
+const TTL_MATCH_TEAMS = 60 * 60 * 1000;   // 1 hour — cached opponent/ally ranked data per match
 
 async function getPuuid(gameName, tagLine) {
   const key = `puuid:${gameName}:${tagLine}`;
@@ -519,12 +520,19 @@ app.get('/api/match/:matchId/opponents', async (req, res) => {
     const puuid = req.query.puuid;
     if (!puuid) return res.status(400).json({ error: 'puuid query param required' });
 
+    // Check for cached response first — avoids all ranked API calls on repeat clicks
+    const cacheKey = `matchTeams:${matchId}:${puuid}`;
+    const cached = cacheGet(cacheKey);
+    if (cached && !cached.stale) {
+      return res.json(cached.data);
+    }
+
     const match = await getMatchDetail(matchId);
     if (!match) return res.status(404).json({ error: 'Match not found' });
 
     // Arena has no traditional enemy team
     if (match.info.gameMode === 'CHERRY') {
-      return res.json({ opponents: [] });
+      return res.json({ team: [], opponents: [] });
     }
 
     const currentPlayer = match.info.participants.find(p => p.puuid === puuid);
@@ -562,7 +570,9 @@ app.get('/api/match/:matchId/opponents', async (req, res) => {
       Promise.all(enemies.map(buildPlayerInfo))
     ]);
 
-    res.json({ team: teamData, opponents: enemyData });
+    const result = { team: teamData, opponents: enemyData };
+    cacheSet(cacheKey, result, TTL_MATCH_TEAMS);
+    res.json(result);
   } catch (err) {
     console.error(`Error in /api/match/${req.params.matchId}/opponents:`, err.message);
     res.status(500).json({ error: err.message });
