@@ -556,7 +556,11 @@
         .join('');
 
       // Click-to-expand: show enemy team with ranked data
-      recentMatches.addEventListener('click', async (e) => {
+      // Remove old listener to prevent stacking on re-render
+      if (recentMatches._expandHandler) {
+        recentMatches.removeEventListener('click', recentMatches._expandHandler);
+      }
+      recentMatches._expandHandler = async (e) => {
         const row = e.target.closest('.match-row[data-match-id]');
         if (!row) return;
 
@@ -622,7 +626,8 @@
           panel.classList.remove('loading');
           panel.innerHTML = '<div class="empty-state">Failed to load opponent data.</div>';
         }
-      });
+      };
+      recentMatches.addEventListener('click', recentMatches._expandHandler);
     } else {
       recentMatches.innerHTML = '<div class="empty-state">No recent matches found.</div>';
     }
