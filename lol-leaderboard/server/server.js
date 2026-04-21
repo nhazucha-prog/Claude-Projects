@@ -162,24 +162,27 @@ async function riotFetch(url, retryCount = 0) {
 // ---------------------------------------------------------------------------
 
 const TTL_PUUID = 24 * 60 * 60 * 1000;   // 24 hours
-const TTL_RANKED = 5 * 60 * 1000;          // 5 minutes
-const TTL_MATCH_IDS = 3 * 60 * 1000;       // 3 minutes
+const TTL_RANKED = 30 * 60 * 1000;         // 30 minutes (was 5min — reduces API calls significantly)
+const TTL_MATCH_IDS = 10 * 60 * 1000;      // 10 minutes (was 3min — new matches don't appear that fast)
 const TTL_MATCH_DETAIL = 0;                 // indefinite
-const TTL_MATCH_TEAMS = 60 * 60 * 1000;   // 1 hour — cached opponent/ally ranked data per match
+const TTL_MATCH_TEAMS = 2 * 60 * 60 * 1000; // 2 hours — cached opponent/ally ranked data per match
 
 async function getPuuid(gameName, tagLine) {
   const key = `puuid:${gameName}:${tagLine}`;
   const cached = cacheGet(key);
   if (cached && !cached.stale) return cached.data;
 
-  const url = `https://americas.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`;
-  const data = await riotFetch(url);
+  try {
+    const url = `https://americas.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`;
+    const data = await riotFetch(url);
+    if (data) {
+      cacheSet(key, data.puuid, TTL_PUUID);
+      return data.puuid;
+    }
+  } catch (_) { /* fall through to stale cache */ }
 
-  if (!data && cached) return cached.data; // 429 fallback
-  if (!data) throw new Error(`Failed to get PUUID for ${gameName}#${tagLine}`);
-
-  cacheSet(key, data.puuid, TTL_PUUID);
-  return data.puuid;
+  if (cached) return cached.data; // serve stale on any failure
+  throw new Error(`Failed to get PUUID for ${gameName}#${tagLine}`);
 }
 
 async function getRankedData(puuid) {
@@ -187,14 +190,17 @@ async function getRankedData(puuid) {
   const cached = cacheGet(key);
   if (cached && !cached.stale) return cached.data;
 
-  const url = `https://na1.api.riotgames.com/lol/league/v4/entries/by-puuid/${encodeURIComponent(puuid)}`;
-  const data = await riotFetch(url);
+  try {
+    const url = `https://na1.api.riotgames.com/lol/league/v4/entries/by-puuid/${encodeURIComponent(puuid)}`;
+    const data = await riotFetch(url);
+    if (data) {
+      cacheSet(key, data, TTL_RANKED);
+      return data;
+    }
+  } catch (_) { /* fall through to stale cache */ }
 
-  if (!data && cached) return cached.data;
-  if (!data) return [];
-
-  cacheSet(key, data, TTL_RANKED);
-  return data;
+  if (cached) return cached.data; // serve stale on any failure
+  return [];
 }
 
 async function getMatchIds(puuid, count = 10, queue = null) {
@@ -202,15 +208,18 @@ async function getMatchIds(puuid, count = 10, queue = null) {
   const cached = cacheGet(key);
   if (cached && !cached.stale) return cached.data;
 
-  let url = `https://americas.api.riotgames.com/lol/match/v5/matches/by-puuid/${encodeURIComponent(puuid)}/ids?count=${count}`;
-  if (queue) url += `&queue=${queue}`;
-  const data = await riotFetch(url);
+  try {
+    let url = `https://americas.api.riotgames.com/lol/match/v5/matches/by-puuid/${encodeURIComponent(puuid)}/ids?count=${count}`;
+    if (queue) url += `&queue=${queue}`;
+    const data = await riotFetch(url);
+    if (data) {
+      cacheSet(key, data, TTL_MATCH_IDS);
+      return data;
+    }
+  } catch (_) { /* fall through to stale cache */ }
 
-  if (!data && cached) return cached.data;
-  if (!data) return [];
-
-  cacheSet(key, data, TTL_MATCH_IDS);
-  return data;
+  if (cached) return cached.data; // serve stale on any failure
+  return [];
 }
 
 async function getMatchDetail(matchId) {
@@ -463,6 +472,13 @@ app.get('/api/players', async (req, res) => {
       return res.status(400).json({ error: 'Missing names query parameter' });
     }
 
+    // Cache the full leaderboard response so repeated page loads don't re-fetch
+    const leaderboardKey = `leaderboard:${names}:${queue || 'all'}`;
+    const cachedLB = cacheGet(leaderboardKey);
+    if (cachedLB && !cachedLB.stale) {
+      return res.json(cachedLB.data);
+    }
+
     const playerPairs = names.split(',').map(n => {
       const parts = n.trim().split('-');
       const tagLine = parts.pop();
@@ -495,6 +511,8 @@ app.get('/api/players', async (req, res) => {
       })
     );
 
+    // Cache for 2 minutes — short enough to feel fresh, long enough to absorb repeat loads
+    cacheSet(leaderboardKey, results, 2 * 60 * 1000);
     res.json(results);
   } catch (err) {
     console.error('Error in /api/players:', err);
@@ -582,7 +600,7 @@ app.get('/api/match/:matchId/opponents', async (req, res) => {
 // ---------------------------------------------------------------------------
 // Background pre-cache — refreshes all players every 5 minutes
 // ---------------------------------------------------------------------------
-const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
+const REFRESH_INTERVAL = 15 * 60 * 1000; // 15 minutes (cache handles freshness between refreshes)
 let knownRoster = []; // players to pre-cache (loaded from players.json + synced from frontend)
 let lastBackgroundRefresh = null;
 
