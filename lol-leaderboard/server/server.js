@@ -530,12 +530,13 @@ app.get('/api/match/:matchId/opponents', async (req, res) => {
     const currentPlayer = match.info.participants.find(p => p.puuid === puuid);
     if (!currentPlayer) return res.status(404).json({ error: 'Player not found in match' });
 
+    const allies = match.info.participants.filter(p => p.teamId === currentPlayer.teamId && p.puuid !== puuid);
     const enemies = match.info.participants.filter(p => p.teamId !== currentPlayer.teamId);
 
-    const opponents = await Promise.all(enemies.map(async (e) => {
+    async function buildPlayerInfo(p) {
       let tier = 'UNRANKED', rank = '', lp = 0;
       try {
-        const ranked = await getRankedData(e.puuid);
+        const ranked = await getRankedData(p.puuid);
         const soloQ = (ranked || []).find(r => r.queueType === 'RANKED_SOLO_5x5')
           || (ranked || []).find(r => r.queueType === 'RANKED_FLEX_SR')
           || {};
@@ -545,18 +546,23 @@ app.get('/api/match/:matchId/opponents', async (req, res) => {
       } catch (_) { /* default to UNRANKED */ }
 
       return {
-        riotId: `${e.riotIdGameName || 'Unknown'}#${e.riotIdTagline || '???'}`,
-        champion: e.championName,
-        kills: e.kills,
-        deaths: e.deaths,
-        assists: e.assists,
+        riotId: `${p.riotIdGameName || 'Unknown'}#${p.riotIdTagline || '???'}`,
+        champion: p.championName,
+        kills: p.kills,
+        deaths: p.deaths,
+        assists: p.assists,
         tier,
         rank,
         lp
       };
-    }));
+    }
 
-    res.json({ opponents });
+    const [teamData, enemyData] = await Promise.all([
+      Promise.all(allies.map(buildPlayerInfo)),
+      Promise.all(enemies.map(buildPlayerInfo))
+    ]);
+
+    res.json({ team: teamData, opponents: enemyData });
   } catch (err) {
     console.error(`Error in /api/match/${req.params.matchId}/opponents:`, err.message);
     res.status(500).json({ error: err.message });

@@ -585,17 +585,16 @@
         try {
           const res = await fetch(`${API_BASE}/api/match/${encodeURIComponent(matchId)}/opponents?puuid=${encodeURIComponent(puuid)}`);
           if (!res.ok) throw new Error(`${res.status}`);
-          const { opponents } = await res.json();
+          const { team, opponents } = await res.json();
 
           panel.classList.remove('loading');
-          if (!opponents || opponents.length === 0) {
-            panel.innerHTML = '<div class="empty-state">No opponent data available.</div>';
+          if ((!team || team.length === 0) && (!opponents || opponents.length === 0)) {
+            panel.innerHTML = '<div class="empty-state">No match data available.</div>';
             return;
           }
 
-          panel.innerHTML = `
-            <div class="opponents-header">Enemy Team</div>
-            ${opponents.map(op => {
+          function renderTeamRows(players) {
+            return players.map(op => {
               const tierLower = (op.tier || 'unranked').toLowerCase();
               const rankText = op.tier === 'UNRANKED'
                 ? 'Unranked'
@@ -607,7 +606,17 @@
                   <span class="opponent-kda">${op.kills}/${op.deaths}/${op.assists}</span>
                   <span class="rank-badge ${tierLower}">${rankText}</span>
                 </div>`;
-            }).join('')}
+            }).join('');
+          }
+
+          panel.innerHTML = `
+            ${team && team.length > 0 ? `
+              <div class="opponents-header">Your Team</div>
+              ${renderTeamRows(team)}
+              <div class="team-divider"></div>
+            ` : ''}
+            <div class="opponents-header">Enemy Team</div>
+            ${renderTeamRows(opponents)}
           `;
         } catch (err) {
           panel.classList.remove('loading');
