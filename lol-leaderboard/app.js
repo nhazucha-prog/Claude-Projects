@@ -588,13 +588,6 @@
           </div>`;
       }
 
-      const ROLE_ICONS = {
-        TOP: `<svg class="role-icon" viewBox="0 0 100 100"><rect x="15" y="15" width="70" height="70" fill="none" stroke="currentColor" stroke-width="6"/><rect x="15" y="15" width="30" height="30" fill="currentColor"/></svg>`,
-        JUNGLE: `<svg class="role-icon" viewBox="0 0 100 100"><path d="M50 90 C50 90 42 70 42 55 C42 42 50 30 50 10 C50 30 58 42 58 55 C58 70 50 90 50 90Z" fill="currentColor"/><path d="M50 70 C50 70 30 55 22 40 C18 33 20 25 28 22 C26 30 32 40 50 55Z" fill="currentColor"/><path d="M50 70 C50 70 70 55 78 40 C82 33 80 25 72 22 C74 30 68 40 50 55Z" fill="currentColor"/></svg>`,
-        MIDDLE: `<svg class="role-icon" viewBox="0 0 100 100"><rect x="22" y="22" width="56" height="56" fill="none" stroke="currentColor" stroke-width="6" transform="rotate(45 50 50)"/><line x1="20" y1="20" x2="45" y2="45" stroke="currentColor" stroke-width="6" stroke-linecap="round"/><line x1="55" y1="55" x2="80" y2="80" stroke="currentColor" stroke-width="6" stroke-linecap="round"/></svg>`,
-        BOTTOM: `<svg class="role-icon" viewBox="0 0 100 100"><rect x="15" y="15" width="70" height="70" fill="none" stroke="currentColor" stroke-width="6"/><rect x="55" y="55" width="30" height="30" fill="currentColor"/></svg>`,
-        UTILITY: `<svg class="role-icon" viewBox="0 0 100 100"><path d="M50 10 L50 40" stroke="currentColor" stroke-width="6" stroke-linecap="round"/><path d="M50 40 L50 90" stroke="currentColor" stroke-width="6" stroke-linecap="round"/><path d="M50 35 C40 35 15 45 10 55 C20 48 35 45 50 50 C65 45 80 48 90 55 C85 45 60 35 50 35Z" fill="currentColor"/><path d="M50 50 C40 52 25 60 20 70 C30 63 40 58 50 60 C60 58 70 63 80 70 C75 60 60 52 50 50Z" fill="currentColor"/><circle cx="50" cy="25" r="6" fill="currentColor"/></svg>`
-      };
       const ROLE_LABELS = { TOP: 'Top', JUNGLE: 'Jungle', MIDDLE: 'Mid', BOTTOM: 'Bot', UTILITY: 'Support' };
 
       function spellImgUrl(icon) {
@@ -619,19 +612,18 @@
             const rankText = op.tier === 'UNRANKED'
               ? 'Unranked'
               : `${op.tier} ${op.rank} ${op.lp} LP`;
-            const roleIcon = op.position && ROLE_ICONS[op.position]
-              ? `<span class="role-indicator" title="${ROLE_LABELS[op.position] || op.position}">${ROLE_ICONS[op.position]}</span>`
-              : '';
+            const roleLabel = ROLE_LABELS[op.position] || '';
             const currentClass = op.isCurrentPlayer ? ' current-player' : '';
             return `
               <div class="opponent-row${currentClass}">
-                ${roleIcon}
                 <img class="match-champ-icon" src="${championImgUrl(op.champion)}" alt="${op.champion}" loading="lazy" onerror="this.style.display='none'">
                 ${renderSpells(op.spells)}
-                <span class="opponent-name">${escapeHtml(op.riotId)}</span>
+                <span class="opponent-name">${escapeHtml(op.riotId)}${roleLabel ? ` <span class="role-label">${roleLabel}</span>` : ''}</span>
+                <span class="opponent-cs">${op.cs} CS</span>
                 <span class="opponent-kda">${op.kills}/${op.deaths}/${op.assists}</span>
                 <span class="rank-badge ${tierLower}">${rankText}</span>
-              </div>`;
+              </div>
+              ${renderItemsRow(op.items)}`;
           }).join('');
         }
         panel.innerHTML = `

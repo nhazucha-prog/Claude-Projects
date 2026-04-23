@@ -713,19 +713,23 @@ h1 {
   height: 24px;
 }
 
-.role-indicator {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
+.role-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  opacity: 0.7;
+  font-weight: 400;
+}
+
+.opponent-cs {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  min-width: 45px;
+  text-align: center;
   flex-shrink: 0;
 }
 
-.role-icon {
-  width: 18px;
-  height: 18px;
-  color: var(--text-muted);
-  opacity: 0.8;
+.opponent-row + .item-row {
+  padding: 2px 0 6px 34px;
 }
 
 .spell-icons {

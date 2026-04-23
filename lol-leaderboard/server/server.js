@@ -656,11 +656,19 @@ app.get('/api/match/:matchId/opponents', async (req, res) => {
         lp = soloQ.leaguePoints || 0;
       } catch (_) { /* default to UNRANKED */ }
 
+      const items = [];
+      for (let i = 0; i < 7; i++) {
+        const item = resolveItem(p[`item${i}`]);
+        if (item) items.push(item);
+      }
+
       return {
         riotId: `${p.riotIdGameName || 'Unknown'}#${p.riotIdTagline || '???'}`,
         champion: p.championName,
         position: p.teamPosition || '',
         spells: [resolveSpell(p.summoner1Id), resolveSpell(p.summoner2Id)].filter(Boolean),
+        items,
+        cs: (p.totalMinionsKilled || 0) + (p.neutralMinionsKilled || 0),
         kills: p.kills,
         deaths: p.deaths,
         assists: p.assists,
