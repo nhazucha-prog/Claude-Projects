@@ -713,11 +713,17 @@ h1 {
   height: 24px;
 }
 
-.role-label {
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  opacity: 0.7;
-  font-weight: 400;
+.opponent-items-inline {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.item-icon-sm {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
 }
 
 .opponent-cs {
@@ -726,10 +732,6 @@ h1 {
   min-width: 45px;
   text-align: center;
   flex-shrink: 0;
-}
-
-.opponent-row + .item-row {
-  padding: 2px 0 6px 34px;
 }
 
 .spell-icons {

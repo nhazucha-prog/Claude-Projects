@@ -612,18 +612,20 @@
             const rankText = op.tier === 'UNRANKED'
               ? 'Unranked'
               : `${op.tier} ${op.rank} ${op.lp} LP`;
-            const roleLabel = ROLE_LABELS[op.position] || '';
             const currentClass = op.isCurrentPlayer ? ' current-player' : '';
+            const inlineItems = (op.items || []).map(item =>
+              `<img class="item-icon-sm" src="${itemImgUrl(item.icon)}" alt="${escapeHtml(item.name)}" title="${escapeHtml(item.name)}" loading="lazy" onerror="this.style.display='none'">`
+            ).join('');
             return `
               <div class="opponent-row${currentClass}">
                 <img class="match-champ-icon" src="${championImgUrl(op.champion)}" alt="${op.champion}" loading="lazy" onerror="this.style.display='none'">
                 ${renderSpells(op.spells)}
-                <span class="opponent-name">${escapeHtml(op.riotId)}${roleLabel ? ` <span class="role-label">${roleLabel}</span>` : ''}</span>
+                <span class="opponent-name">${escapeHtml(op.riotId)}</span>
+                <span class="opponent-items-inline">${inlineItems}</span>
                 <span class="opponent-cs">${op.cs} CS</span>
                 <span class="opponent-kda">${op.kills}/${op.deaths}/${op.assists}</span>
                 <span class="rank-badge ${tierLower}">${rankText}</span>
-              </div>
-              ${renderItemsRow(op.items)}`;
+              </div>`;
           }).join('');
         }
         panel.innerHTML = `
