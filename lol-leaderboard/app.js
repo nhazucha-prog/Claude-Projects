@@ -588,6 +588,15 @@
           </div>`;
       }
 
+      const ROLE_ICONS = {
+        TOP: `<svg class="role-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h18v18H3V3zm2 2v6h6V5H5zm8 0v14h6V5h-6zM5 13v6h6v-6H5z" opacity="0.3"/><path d="M13 5h4v12h-4V5z" opacity="0.9"/><path d="M5 5h4v4H5V5z" opacity="0.9"/></svg>`,
+        JUNGLE: `<svg class="role-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8 2 4 6 4 10c0 3 2 5 4 6l-1 4h10l-1-4c2-1 4-3 4-6 0-4-4-8-8-8zm0 3c1 0 2 .5 2.5 1.5S15 9 15 10h-6c0-1 .5-2.5 1-3.5S11 3 12 5z"/></svg>`,
+        MIDDLE: `<svg class="role-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h18v18H3V3zm2 2v14h14V5H5z" opacity="0.3"/><path d="M5 5l14 14M5 5h4l10 10v4H15L5 9V5z" fill="currentColor" opacity="0.9"/></svg>`,
+        BOTTOM: `<svg class="role-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h18v18H3V3zm2 2v6h6V5H5zm8 0v6h6V5h-6zm-8 8v6h6v-6H5z" opacity="0.3"/><path d="M5 13h4v6H5v-6z" opacity="0.9"/><path d="M13 13h4v6h-4v-6z" opacity="0.9"/></svg>`,
+        UTILITY: `<svg class="role-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3 6h6l-5 4 2 6-6-4-6 4 2-6-5-4h6z"/></svg>`
+      };
+      const ROLE_LABELS = { TOP: 'Top', JUNGLE: 'Jungle', MIDDLE: 'Mid', BOTTOM: 'Bot', UTILITY: 'Support' };
+
       function renderRankedPanel(panel, data) {
         const { team, opponents } = data;
         if ((!team || team.length === 0) && (!opponents || opponents.length === 0)) {
@@ -600,8 +609,13 @@
             const rankText = op.tier === 'UNRANKED'
               ? 'Unranked'
               : `${op.tier} ${op.rank} ${op.lp} LP`;
+            const roleIcon = op.position && ROLE_ICONS[op.position]
+              ? `<span class="role-indicator" title="${ROLE_LABELS[op.position] || op.position}">${ROLE_ICONS[op.position]}</span>`
+              : '';
+            const currentClass = op.isCurrentPlayer ? ' current-player' : '';
             return `
-              <div class="opponent-row">
+              <div class="opponent-row${currentClass}">
+                ${roleIcon}
                 <img class="match-champ-icon" src="${championImgUrl(op.champion)}" alt="${op.champion}" loading="lazy" onerror="this.style.display='none'">
                 <span class="opponent-name">${escapeHtml(op.riotId)}</span>
                 <span class="opponent-kda">${op.kills}/${op.deaths}/${op.assists}</span>

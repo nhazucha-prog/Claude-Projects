@@ -619,7 +619,8 @@ app.get('/api/match/:matchId/opponents', async (req, res) => {
     const currentPlayer = match.info.participants.find(p => p.puuid === puuid);
     if (!currentPlayer) return res.status(404).json({ error: 'Player not found in match' });
 
-    const allies = match.info.participants.filter(p => p.teamId === currentPlayer.teamId && p.puuid !== puuid);
+    const ROLE_ORDER = { TOP: 0, JUNGLE: 1, MIDDLE: 2, BOTTOM: 3, UTILITY: 4 };
+    const allies = match.info.participants.filter(p => p.teamId === currentPlayer.teamId);
     const enemies = match.info.participants.filter(p => p.teamId !== currentPlayer.teamId);
 
     async function buildPlayerInfo(p) {
@@ -637,12 +638,14 @@ app.get('/api/match/:matchId/opponents', async (req, res) => {
       return {
         riotId: `${p.riotIdGameName || 'Unknown'}#${p.riotIdTagline || '???'}`,
         champion: p.championName,
+        position: p.teamPosition || '',
         kills: p.kills,
         deaths: p.deaths,
         assists: p.assists,
         tier,
         rank,
-        lp
+        lp,
+        isCurrentPlayer: p.puuid === puuid
       };
     }
 
@@ -650,6 +653,11 @@ app.get('/api/match/:matchId/opponents', async (req, res) => {
       Promise.all(allies.map(buildPlayerInfo)),
       Promise.all(enemies.map(buildPlayerInfo))
     ]);
+
+    // Sort by role order: TOP → JNG → MID → BOT → SUP
+    const sortByRole = (a, b) => (ROLE_ORDER[a.position] ?? 5) - (ROLE_ORDER[b.position] ?? 5);
+    teamData.sort(sortByRole);
+    enemyData.sort(sortByRole);
 
     const result = { team: teamData, opponents: enemyData };
     cacheSet(cacheKey, result, TTL_MATCH_TEAMS);

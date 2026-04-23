@@ -713,6 +713,35 @@ h1 {
   height: 24px;
 }
 
+.role-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  flex-shrink: 0;
+}
+
+.role-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+
+.opponent-row.current-player {
+  background: rgba(99, 102, 241, 0.08);
+  border-radius: 6px;
+  padding-left: 6px;
+  margin-left: -6px;
+  padding-right: 6px;
+  margin-right: -6px;
+}
+
+.opponent-row.current-player .opponent-name {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 .team-divider {
   border-top: 1px solid var(--border);
   margin: 10px 0;
