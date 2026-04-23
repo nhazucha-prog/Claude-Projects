@@ -720,10 +720,19 @@ h1 {
 }
 
 .item-icon-sm {
-  width: 18px;
-  height: 18px;
+  width: 21px;
+  height: 21px;
   border-radius: 3px;
   border: 1px solid var(--border);
+  transition: transform 0.15s ease;
+  cursor: pointer;
+}
+
+.item-icon-sm:hover {
+  transform: scale(2.8);
+  z-index: 10;
+  position: relative;
+  border-color: var(--accent);
 }
 
 .opponent-cs {
