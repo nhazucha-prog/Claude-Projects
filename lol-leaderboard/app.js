@@ -539,8 +539,8 @@
             ? `#${m.placement}`
             : (m.win ? 'W' : 'L');
           const csText = isArena ? '' : `<span class="match-cs">${m.cs} CS</span>`;
-          const expandAttrs = !isArena && m.matchId
-            ? `data-match-id="${escapeAttr(m.matchId)}" data-puuid="${escapeAttr(data.puuid || '')}" style="animation-delay: ${i * 0.04}s; cursor: pointer;"`
+          const expandAttrs = m.matchId
+            ? `data-match-id="${escapeAttr(m.matchId)}" data-puuid="${escapeAttr(data.puuid || '')}"${isArena ? ' data-arena="true"' : ''} style="animation-delay: ${i * 0.04}s; cursor: pointer;"`
             : `style="animation-delay: ${i * 0.04}s"`;
           return `
             <div class="match-row ${m.win ? 'win' : ''}" ${expandAttrs}>
@@ -550,12 +550,109 @@
               ${csText}
               <span class="match-duration">${m.duration}</span>
               <span class="match-meta">${escapeHtml(m.timeAgo)}</span>
-              ${!isArena && m.matchId ? '<span class="match-expand-hint">&#x25BC;</span>' : ''}
+              ${m.matchId ? '<span class="match-expand-hint">&#x25BC;</span>' : ''}
             </div>`;
         })
         .join('');
 
-      // Click-to-expand: show enemy team with ranked data
+      function itemImgUrl(iconFile) {
+        return `https://ddragon.leagueoflegends.com/cdn/${DDRAGON_VERSION}/img/item/${iconFile}`;
+      }
+
+      function renderItemsRow(items) {
+        if (!items || items.length === 0) return '';
+        return `<div class="item-row">${items.map(item =>
+          `<img class="item-icon" src="${itemImgUrl(item.icon)}" alt="${escapeHtml(item.name)}" title="${escapeHtml(item.name)}" loading="lazy" onerror="this.style.display='none'">`
+        ).join('')}</div>`;
+      }
+
+      function renderAugmentsList(augments) {
+        if (!augments || augments.length === 0) return '';
+        return `<div class="augment-list">${augments.map(a =>
+          `<span class="augment-tag">${escapeHtml(a.name)}</span>`
+        ).join('')}</div>`;
+      }
+
+      function renderArenaPlayerCard(p, label) {
+        return `
+          <div class="arena-player-card">
+            <div class="arena-player-header">
+              <img class="match-champ-icon" src="${championImgUrl(p.champion)}" alt="${p.champion}" loading="lazy" onerror="this.style.display='none'">
+              <div class="arena-player-info">
+                <span class="arena-player-name">${escapeHtml(p.riotId)}</span>
+                <span class="arena-player-kda">${p.kills}/${p.deaths}/${p.assists}</span>
+              </div>
+            </div>
+            ${renderItemsRow(p.items)}
+            ${renderAugmentsList(p.augments)}
+          </div>`;
+      }
+
+      function renderRankedPanel(panel, data) {
+        const { team, opponents } = data;
+        if ((!team || team.length === 0) && (!opponents || opponents.length === 0)) {
+          panel.innerHTML = '<div class="empty-state">No match data available.</div>';
+          return;
+        }
+        function renderTeamRows(players) {
+          return players.map(op => {
+            const tierLower = (op.tier || 'unranked').toLowerCase();
+            const rankText = op.tier === 'UNRANKED'
+              ? 'Unranked'
+              : `${op.tier} ${op.rank} ${op.lp} LP`;
+            return `
+              <div class="opponent-row">
+                <img class="match-champ-icon" src="${championImgUrl(op.champion)}" alt="${op.champion}" loading="lazy" onerror="this.style.display='none'">
+                <span class="opponent-name">${escapeHtml(op.riotId)}</span>
+                <span class="opponent-kda">${op.kills}/${op.deaths}/${op.assists}</span>
+                <span class="rank-badge ${tierLower}">${rankText}</span>
+              </div>`;
+          }).join('');
+        }
+        panel.innerHTML = `
+          ${team && team.length > 0 ? `
+            <div class="opponents-header">Your Team</div>
+            ${renderTeamRows(team)}
+            <div class="team-divider"></div>
+          ` : ''}
+          <div class="opponents-header">Enemy Team</div>
+          ${renderTeamRows(opponents)}
+        `;
+      }
+
+      function renderArenaPanel(panel, data) {
+        const { placement, player, teammate, otherTeams } = data;
+        const placementLabels = ['', '1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'];
+        const placementClass = placement <= 4 ? 'top-half' : 'bottom-half';
+
+        let html = `
+          <div class="arena-placement ${placementClass}">
+            ${placementLabels[placement] || placement} Place
+          </div>
+          <div class="opponents-header">Your Duo</div>
+          <div class="arena-duo-section">
+            ${renderArenaPlayerCard(player, 'You')}
+            ${teammate ? renderArenaPlayerCard(teammate, 'Teammate') : ''}
+          </div>`;
+
+        if (otherTeams && otherTeams.length > 0) {
+          html += `<div class="team-divider"></div>
+            <div class="opponents-header">Other Teams</div>`;
+          for (const team of otherTeams) {
+            html += `
+              <div class="arena-other-team">
+                <div class="arena-team-placement">${placementLabels[team.placement] || team.placement}</div>
+                <div class="arena-duo-section">
+                  ${team.players.map(p => renderArenaPlayerCard(p)).join('')}
+                </div>
+              </div>`;
+          }
+        }
+
+        panel.innerHTML = html;
+      }
+
+      // Click-to-expand: show match details
       // Remove old listener to prevent stacking on re-render
       if (recentMatches._expandHandler) {
         recentMatches.removeEventListener('click', recentMatches._expandHandler);
@@ -586,45 +683,25 @@
         panel.innerHTML = '<div class="spinner"></div>';
         row.after(panel);
 
+        const isArenaMatch = row.dataset.arena === 'true';
+        const endpoint = isArenaMatch
+          ? `${API_BASE}/api/match/${encodeURIComponent(matchId)}/arena?puuid=${encodeURIComponent(puuid)}`
+          : `${API_BASE}/api/match/${encodeURIComponent(matchId)}/opponents?puuid=${encodeURIComponent(puuid)}`;
+
         try {
-          const res = await fetch(`${API_BASE}/api/match/${encodeURIComponent(matchId)}/opponents?puuid=${encodeURIComponent(puuid)}`);
+          const res = await fetch(endpoint);
           if (!res.ok) throw new Error(`${res.status}`);
-          const { team, opponents } = await res.json();
-
+          const data = await res.json();
           panel.classList.remove('loading');
-          if ((!team || team.length === 0) && (!opponents || opponents.length === 0)) {
-            panel.innerHTML = '<div class="empty-state">No match data available.</div>';
-            return;
-          }
 
-          function renderTeamRows(players) {
-            return players.map(op => {
-              const tierLower = (op.tier || 'unranked').toLowerCase();
-              const rankText = op.tier === 'UNRANKED'
-                ? 'Unranked'
-                : `${op.tier} ${op.rank} ${op.lp} LP`;
-              return `
-                <div class="opponent-row">
-                  <img class="match-champ-icon" src="${championImgUrl(op.champion)}" alt="${op.champion}" loading="lazy" onerror="this.style.display='none'">
-                  <span class="opponent-name">${escapeHtml(op.riotId)}</span>
-                  <span class="opponent-kda">${op.kills}/${op.deaths}/${op.assists}</span>
-                  <span class="rank-badge ${tierLower}">${rankText}</span>
-                </div>`;
-            }).join('');
+          if (isArenaMatch) {
+            renderArenaPanel(panel, data);
+          } else {
+            renderRankedPanel(panel, data);
           }
-
-          panel.innerHTML = `
-            ${team && team.length > 0 ? `
-              <div class="opponents-header">Your Team</div>
-              ${renderTeamRows(team)}
-              <div class="team-divider"></div>
-            ` : ''}
-            <div class="opponents-header">Enemy Team</div>
-            ${renderTeamRows(opponents)}
-          `;
         } catch (err) {
           panel.classList.remove('loading');
-          panel.innerHTML = '<div class="empty-state">Failed to load opponent data.</div>';
+          panel.innerHTML = '<div class="empty-state">Failed to load match data.</div>';
         }
       };
       recentMatches.addEventListener('click', recentMatches._expandHandler);

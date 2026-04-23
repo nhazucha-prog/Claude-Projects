@@ -9,6 +9,69 @@ const PORT = process.env.PORT || 3001;
 const RIOT_API_KEY = process.env.RIOT_API_KEY;
 
 // ---------------------------------------------------------------------------
+// DDragon item data + augment mappings (loaded on startup)
+// ---------------------------------------------------------------------------
+let ddragonVersion = '14.10.1';
+let itemData = {}; // id -> { name, icon }
+let augmentData = {}; // id -> { name }
+
+async function loadDDragonItems() {
+  try {
+    // Get latest version
+    const verRes = await fetch('https://ddragon.leagueoflegends.com/api/versions.json');
+    if (verRes.ok) {
+      const versions = await verRes.json();
+      if (Array.isArray(versions) && versions.length > 0) {
+        ddragonVersion = versions[0];
+      }
+    }
+    // Fetch item data
+    const itemRes = await fetch(`https://ddragon.leagueoflegends.com/cdn/${ddragonVersion}/data/en_US/item.json`);
+    if (itemRes.ok) {
+      const raw = await itemRes.json();
+      itemData = {};
+      for (const [id, item] of Object.entries(raw.data || {})) {
+        itemData[id] = { name: item.name, icon: item.image ? item.image.full : `${id}.png` };
+      }
+      console.log(`Loaded ${Object.keys(itemData).length} items from DDragon v${ddragonVersion}`);
+    }
+  } catch (err) {
+    console.warn('Could not load DDragon item data:', err.message);
+  }
+}
+
+function loadAugmentData() {
+  try {
+    const augFile = path.join(__dirname, '..', 'augments.json');
+    if (fs.existsSync(augFile)) {
+      augmentData = JSON.parse(fs.readFileSync(augFile, 'utf8'));
+      console.log(`Loaded ${Object.keys(augmentData).length} augment mappings`);
+    }
+  } catch (err) {
+    console.warn('Could not load augments.json:', err.message);
+  }
+}
+
+function resolveItem(itemId) {
+  if (!itemId || itemId === 0) return null;
+  const item = itemData[String(itemId)];
+  return {
+    id: itemId,
+    name: item ? item.name : `Item #${itemId}`,
+    icon: item ? item.icon : `${itemId}.png`
+  };
+}
+
+function resolveAugment(augId) {
+  if (!augId || augId === 0) return null;
+  const aug = augmentData[String(augId)];
+  return {
+    id: augId,
+    name: aug ? aug.name : `Augment #${augId}`
+  };
+}
+
+// ---------------------------------------------------------------------------
 // CORS
 // ---------------------------------------------------------------------------
 app.use(cors({
@@ -597,8 +660,88 @@ app.get('/api/match/:matchId/opponents', async (req, res) => {
   }
 });
 
+app.get('/api/match/:matchId/arena', async (req, res) => {
+  try {
+    const { matchId } = req.params;
+    const puuid = req.query.puuid;
+    if (!puuid) return res.status(400).json({ error: 'puuid query param required' });
+
+    // Check cache first — Arena data is immutable
+    const cacheKey = `arenaDetail:${matchId}:${puuid}`;
+    const cached = cacheGet(cacheKey);
+    if (cached) return res.json(cached.data);
+
+    const match = await getMatchDetail(matchId);
+    if (!match) return res.status(404).json({ error: 'Match not found' });
+    if (match.info.gameMode !== 'CHERRY') {
+      return res.status(400).json({ error: 'Not an Arena match' });
+    }
+
+    const currentPlayer = match.info.participants.find(p => p.puuid === puuid);
+    if (!currentPlayer) return res.status(404).json({ error: 'Player not found in match' });
+
+    function buildArenaPlayer(p) {
+      const items = [];
+      for (let i = 0; i <= 6; i++) {
+        const item = resolveItem(p[`item${i}`]);
+        if (item) items.push(item);
+      }
+      const augments = [];
+      for (let i = 1; i <= 6; i++) {
+        const aug = resolveAugment(p[`playerAugment${i}`]);
+        if (aug) augments.push(aug);
+      }
+      return {
+        riotId: `${p.riotIdGameName || 'Unknown'}#${p.riotIdTagline || '???'}`,
+        champion: p.championName,
+        kills: p.kills,
+        deaths: p.deaths,
+        assists: p.assists,
+        placement: p.placement,
+        subteamId: p.playerSubteamId,
+        items,
+        augments
+      };
+    }
+
+    // Build player data
+    const player = buildArenaPlayer(currentPlayer);
+
+    // Find teammate (same subteam, different puuid)
+    const teammateParticipant = match.info.participants.find(
+      p => p.playerSubteamId === currentPlayer.playerSubteamId && p.puuid !== puuid
+    );
+    const teammate = teammateParticipant ? buildArenaPlayer(teammateParticipant) : null;
+
+    // Build other teams grouped by subteamId
+    const teamMap = {};
+    for (const p of match.info.participants) {
+      if (p.playerSubteamId === currentPlayer.playerSubteamId) continue;
+      if (!teamMap[p.playerSubteamId]) {
+        teamMap[p.playerSubteamId] = { placement: p.placement, players: [] };
+      }
+      teamMap[p.playerSubteamId].players.push(buildArenaPlayer(p));
+    }
+    const otherTeams = Object.values(teamMap).sort((a, b) => a.placement - b.placement);
+
+    const result = {
+      placement: currentPlayer.placement,
+      player,
+      teammate,
+      otherTeams
+    };
+
+    // Cache indefinitely — Arena match data never changes
+    cacheSet(cacheKey, result, 0);
+    res.json(result);
+  } catch (err) {
+    console.error(`Error in /api/match/${req.params.matchId}/arena:`, err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ---------------------------------------------------------------------------
-// Background pre-cache — refreshes all players every 5 minutes
+// Background pre-cache — refreshes all players every 15 minutes
 // ---------------------------------------------------------------------------
 const REFRESH_INTERVAL = 15 * 60 * 1000; // 15 minutes (cache handles freshness between refreshes)
 let knownRoster = []; // players to pre-cache (loaded from players.json + synced from frontend)
@@ -757,14 +900,16 @@ app.listen(PORT, () => {
     console.warn('WARNING: RIOT_API_KEY is not set. API calls will fail.');
   }
 
-  // Load disk cache and default roster, then do first background refresh
+  // Load disk cache, roster, augments, then DDragon items + background refresh
   loadCacheFromDisk();
   loadDefaultRoster();
+  loadAugmentData();
 
-  // Initial refresh after a short delay (let server finish starting)
-  setTimeout(() => {
-    backgroundRefresh();
-    // Then refresh every 5 minutes
-    setInterval(backgroundRefresh, REFRESH_INTERVAL);
-  }, 2000);
+  // Load DDragon items then start background refresh
+  loadDDragonItems().then(() => {
+    setTimeout(() => {
+      backgroundRefresh();
+      setInterval(backgroundRefresh, REFRESH_INTERVAL);
+    }, 2000);
+  });
 });
