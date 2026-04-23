@@ -14,6 +14,7 @@ const RIOT_API_KEY = process.env.RIOT_API_KEY;
 let ddragonVersion = '14.10.1';
 let itemData = {}; // id -> { name, icon }
 let augmentData = {}; // id -> { name }
+let summonerSpellData = {}; // id -> { name, icon }
 
 async function loadDDragonItems() {
   try {
@@ -35,8 +36,18 @@ async function loadDDragonItems() {
       }
       console.log(`Loaded ${Object.keys(itemData).length} items from DDragon v${ddragonVersion}`);
     }
+    // Fetch summoner spell data
+    const spellRes = await fetch(`https://ddragon.leagueoflegends.com/cdn/${ddragonVersion}/data/en_US/summoner.json`);
+    if (spellRes.ok) {
+      const raw = await spellRes.json();
+      summonerSpellData = {};
+      for (const spell of Object.values(raw.data || {})) {
+        summonerSpellData[spell.key] = { name: spell.name, icon: spell.image ? spell.image.full : '' };
+      }
+      console.log(`Loaded ${Object.keys(summonerSpellData).length} summoner spells from DDragon`);
+    }
   } catch (err) {
-    console.warn('Could not load DDragon item data:', err.message);
+    console.warn('Could not load DDragon data:', err.message);
   }
 }
 
@@ -68,6 +79,16 @@ function resolveAugment(augId) {
   return {
     id: augId,
     name: aug ? aug.name : `Augment #${augId}`
+  };
+}
+
+function resolveSpell(spellId) {
+  if (!spellId) return null;
+  const spell = summonerSpellData[String(spellId)];
+  return {
+    id: spellId,
+    name: spell ? spell.name : `Spell ${spellId}`,
+    icon: spell ? spell.icon : ''
   };
 }
 
@@ -639,6 +660,7 @@ app.get('/api/match/:matchId/opponents', async (req, res) => {
         riotId: `${p.riotIdGameName || 'Unknown'}#${p.riotIdTagline || '???'}`,
         champion: p.championName,
         position: p.teamPosition || '',
+        spells: [resolveSpell(p.summoner1Id), resolveSpell(p.summoner2Id)].filter(Boolean),
         kills: p.kills,
         deaths: p.deaths,
         assists: p.assists,

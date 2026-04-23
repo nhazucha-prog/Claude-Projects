@@ -589,13 +589,23 @@
       }
 
       const ROLE_ICONS = {
-        TOP: `<svg class="role-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h18v18H3V3zm2 2v6h6V5H5zm8 0v14h6V5h-6zM5 13v6h6v-6H5z" opacity="0.3"/><path d="M13 5h4v12h-4V5z" opacity="0.9"/><path d="M5 5h4v4H5V5z" opacity="0.9"/></svg>`,
-        JUNGLE: `<svg class="role-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8 2 4 6 4 10c0 3 2 5 4 6l-1 4h10l-1-4c2-1 4-3 4-6 0-4-4-8-8-8zm0 3c1 0 2 .5 2.5 1.5S15 9 15 10h-6c0-1 .5-2.5 1-3.5S11 3 12 5z"/></svg>`,
-        MIDDLE: `<svg class="role-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h18v18H3V3zm2 2v14h14V5H5z" opacity="0.3"/><path d="M5 5l14 14M5 5h4l10 10v4H15L5 9V5z" fill="currentColor" opacity="0.9"/></svg>`,
-        BOTTOM: `<svg class="role-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h18v18H3V3zm2 2v6h6V5H5zm8 0v6h6V5h-6zm-8 8v6h6v-6H5z" opacity="0.3"/><path d="M5 13h4v6H5v-6z" opacity="0.9"/><path d="M13 13h4v6h-4v-6z" opacity="0.9"/></svg>`,
-        UTILITY: `<svg class="role-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3 6h6l-5 4 2 6-6-4-6 4 2-6-5-4h6z"/></svg>`
+        TOP: `<svg class="role-icon" viewBox="0 0 100 100"><polygon points="50,8 85,35 85,75 50,92 15,75 15,35" fill="none" stroke="currentColor" stroke-width="6"/><polygon points="50,20 30,45 30,65 50,78" fill="currentColor" opacity="0.9"/><line x1="50" y1="20" x2="70" y2="65" stroke="currentColor" stroke-width="4" opacity="0.4"/></svg>`,
+        JUNGLE: `<svg class="role-icon" viewBox="0 0 100 100"><path d="M50 10 C40 30, 25 40, 20 60 C15 80, 30 95, 50 95 C70 95, 85 80, 80 60 C75 40, 60 30, 50 10Z" fill="none" stroke="currentColor" stroke-width="6"/><path d="M50 35 C45 45, 38 50, 35 60 C32 72, 40 82, 50 82 C60 82, 68 72, 65 60 C62 50, 55 45, 50 35Z" fill="currentColor" opacity="0.8"/></svg>`,
+        MIDDLE: `<svg class="role-icon" viewBox="0 0 100 100"><rect x="12" y="12" width="76" height="76" rx="4" fill="none" stroke="currentColor" stroke-width="6"/><path d="M12 12 L42 42 M58 58 L88 88" stroke="currentColor" stroke-width="8" stroke-linecap="round"/><circle cx="50" cy="50" r="8" fill="currentColor"/></svg>`,
+        BOTTOM: `<svg class="role-icon" viewBox="0 0 100 100"><polygon points="50,8 85,35 85,75 50,92 15,75 15,35" fill="none" stroke="currentColor" stroke-width="6"/><polygon points="50,78 70,55 70,35 50,22" fill="currentColor" opacity="0.9"/><line x1="50" y1="78" x2="30" y2="35" stroke="currentColor" stroke-width="4" opacity="0.4"/></svg>`,
+        UTILITY: `<svg class="role-icon" viewBox="0 0 100 100"><path d="M50 8 L85 35 L85 75 L50 92 L15 75 L15 35 Z" fill="none" stroke="currentColor" stroke-width="6"/><line x1="50" y1="30" x2="50" y2="70" stroke="currentColor" stroke-width="8" stroke-linecap="round"/><line x1="30" y1="50" x2="70" y2="50" stroke="currentColor" stroke-width="8" stroke-linecap="round"/></svg>`
       };
       const ROLE_LABELS = { TOP: 'Top', JUNGLE: 'Jungle', MIDDLE: 'Mid', BOTTOM: 'Bot', UTILITY: 'Support' };
+
+      function spellImgUrl(icon) {
+        return `https://ddragon.leagueoflegends.com/cdn/${DDRAGON_VERSION}/img/spell/${icon}`;
+      }
+      function renderSpells(spells) {
+        if (!spells || spells.length === 0) return '';
+        return `<span class="spell-icons">${spells.map(s =>
+          `<img class="spell-icon" src="${spellImgUrl(s.icon)}" alt="${escapeHtml(s.name)}" title="${escapeHtml(s.name)}" loading="lazy" onerror="this.style.display='none'">`
+        ).join('')}</span>`;
+      }
 
       function renderRankedPanel(panel, data) {
         const { team, opponents } = data;
@@ -617,6 +627,7 @@
               <div class="opponent-row${currentClass}">
                 ${roleIcon}
                 <img class="match-champ-icon" src="${championImgUrl(op.champion)}" alt="${op.champion}" loading="lazy" onerror="this.style.display='none'">
+                ${renderSpells(op.spells)}
                 <span class="opponent-name">${escapeHtml(op.riotId)}</span>
                 <span class="opponent-kda">${op.kills}/${op.deaths}/${op.assists}</span>
                 <span class="rank-badge ${tierLower}">${rankText}</span>
